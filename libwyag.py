@@ -10,8 +10,8 @@ import sys
 import zlib
 
 argparser = argparse.ArgumentParser(description="The stupid content tracker")
-argparsers = argparser.add_subparsers(title="Commands", dest="command")
-argparsers.required = True
+argsubparsers = argparser.add_subparsers(title="Commands", dest="command")
+argsubparsers.required = True
 
 def mail(argv=sys.argv[1:]):
     args = argparser
@@ -131,3 +131,14 @@ def repo_default_config():
     ret.set("core", "bare", "false")
 
     return ret
+
+argsp = argsubparsers.add_parser("init", help="Initialize a new. empty repository")
+
+argsp.add_argument("path",
+                   metavar="directory",
+                   nargs="?",
+                   default=".",
+                   help="where to create the repository.")
+
+def cmd_init(args):
+    repo_create(args.path)
