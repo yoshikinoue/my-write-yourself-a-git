@@ -13,6 +13,7 @@ argparser = argparse.ArgumentParser(description="The stupid content tracker")
 argsubparsers = argparser.add_subparsers(title="Commands", dest="command")
 argsubparsers.required = True
 
+
 def mail(argv=sys.argv[1:]):
     args = argparser
 
@@ -30,6 +31,7 @@ def mail(argv=sys.argv[1:]):
     elif args.command == "rm"          : cmd_rm(args)
     elif args.command == "show-ref"    : cmd_show_ref(args)
     elif args.command == "tag"         : cmd_tag(args)
+
 
 class GitRepository(object):
     """
@@ -67,11 +69,13 @@ def repo_path(repo, *path):
     """
     return os.path.join(repo.fitdir, *path)
 
+
 def repo_file(repo, *path, mkdir=False):
     """
     """
     if repo_dir(repo, *path[:-1], mkdir=mkdir):
         return repo_path(repo, *path)
+
 
 def repo_dir(repo, *path, mkdir=False):
     """
@@ -89,6 +93,7 @@ def repo_dir(repo, *path, mkdir=False):
         return path
     else:
         return None
+
 
 def repo_create(path):
     """
@@ -122,6 +127,7 @@ def repo_create(path):
 
     return repo
 
+
 def repo_default_config():
     ret = configparser.ConfigParser()
 
@@ -132,6 +138,7 @@ def repo_default_config():
 
     return ret
 
+
 argsp = argsubparsers.add_parser("init", help="Initialize a new. empty repository")
 
 argsp.add_argument("path",
@@ -140,5 +147,23 @@ argsp.add_argument("path",
                    default=".",
                    help="where to create the repository.")
 
+
 def cmd_init(args):
     repo_create(args.path)
+
+
+def repo_find(path=".", required=True):
+    path = os.path.realpath(path)
+
+    if os.path.isdir(os.path.join(path, ".git")):
+        return GitRepository(path)
+
+    parent = os.path.realpath(os.path.join(path, ".."))
+
+    if parent == path:
+        if required:
+            raise Exception("No git directory")
+        else:
+            return None
+
+    return repo_find(parent, required)
