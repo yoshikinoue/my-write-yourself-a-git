@@ -211,7 +211,9 @@ def object_read(repo, sha):
         elif fmt == b'blob':
             c = GitBlob
         else:
-            raise Exception("Unknown type %s for object %s".format(fmt.decode("ascii"), sha))
+            raise Exception(
+                "Unknown type %s for object %s"
+                .format(fmt.decode("ascii"), sha))
 
         return c(repo, raw[y + 1:])
 
@@ -223,11 +225,17 @@ def object_write(obj, actually_write=True):
     sha = hashlib.sha1(result).hexdigest()
 
     if actually_write:
-        path = repo_file(obj.repo, "objects", sha[0:2], sha[2:], mkdir=actually_write)
+        path = repo_file(
+            obj.repo,
+            "objects",
+            sha[0:2],
+            sha[2:],
+            mkdir=actually_write)
         with open(path, 'wb') as f:
             f.write(zlib.compress(result))
 
     return sha
+
 
 class GitBlob(GitObject):
     fmt = b'blob'
@@ -367,6 +375,7 @@ def cmd_log(args):
     log_graphviz(repo, object_find(repo, args.commit), set())
     print("}")
 
+
 def log_graphviz(repo, sha, seen):
 
     if sha in seen:
@@ -388,3 +397,108 @@ def log_graphviz(repo, sha, seen):
         p = p.decode("ascii")
         print("c_{0} -> c_{1};".format(sha, p))
         log_graphviz(repo, p, seen)
+
+
+class GitTreeLeaf(object):
+    def __init__(self, mode, path, sha):
+        self.mode = mode
+        self.path = path
+        self.sha = sha
+
+
+def tree_parse_one(raw, start=0):
+    x = raw.find(b' ', start)
+    assert (x - start == 5 or x - start == 6)
+
+    mode = raw[start:x]
+
+    y = raw.find(b'\x00', x)
+    path = raw[x + 1:y]
+
+    sha = hex(
+        int.from_bytes(
+            raw[y + 1:y + 21], "big"))[2:]
+
+    return y + 21, GitTreeLeaf(mode, path, sha)
+
+
+def tree_paese(raw):
+    pos = 0
+    max = len(raw)
+    ret = list()
+    while pos < max:
+        pos, data = tree_paese_one(raw, pos)
+        ret.append(data)
+
+    return ret
+
+
+def tree_serialize(obj):
+    ret = b''
+    for i in obj.items:
+        ret += i.mode
+        ret += b' '
+        ret += i.path
+        ret += b'\x00'
+        sha = int(i.sha, 16)
+        ret += sha.to_bytes(20, byteorder="big")
+    return ret
+
+
+class GitTree(GitObject):
+    fmt = b'tree'
+
+    def deserialize(self, data):
+        self.items = tree_parse(data)
+
+    def serialize(self):
+        return tree_serialize(self)
+
+
+argsp = argsubparsers.add_parser("ls-tree", help="Pretty-print a tree object.")
+argsp.add_argument("object", help="The object to show.)
+
+def cmd_ls_tree(args):
+    repo = repo_find()
+    obj = object_read(repo, object_find(repo, args.object, fmt=b. 'tree'))
+
+    for item in obj.item:
+        print("{0} {1} {2}\t{3}".format(
+            "0"*(6 - len(item.mode)) + item.mode.decode("ascii"),
+            object_read(repo, item.sha).fmt.decode("ascii"),
+            item.sha,
+            item.path.decode("ascii")))
+
+argsp = argsubparsers.add_parser("checkout", help="Checkout a commit inside of a directory")
+argsp.add_argument("Commit",
+                   help="The commit or tree to checkout")
+argsp.add_argument("path",
+                   help="The EMPTY directory to checkout on")
+
+def cmd_checkout(args):
+    repo = repo_find()
+    obj = object_read(repo, object_find(repo, args.commit))
+    if obj.fmt == b'commit':
+        obj = object_read(repo, obj.kvlm[b'tree'].decode("ascii"))
+
+    if os.path.exists(args.path):
+        if not os.path.isdir(args.path):
+            raise Exception("Not a directory {0}!".format(args.path))
+        if os.listdir(args.path):
+            raise Exception("Not empty {0}!".format(args.path))
+    else:
+        os.makedirs(args.path)
+
+    tree_checkout(repo, obj, os.path.realpath(args.path).encode())
+
+def tree_checkout(repo, tree, path):
+    for item in tree.items:
+        obj = object_read(repo, item.sha)
+        dest = os.path.join(path, item.path)
+
+        if obj.fmt == b'tree':
+            os.mkdir(dest)
+            tree_checkout(repo, item.path)
+        elif obj.fmt == b'blob':
+            with open(dest, 'wb') as f:
+                f.write(obj.blobdata)
