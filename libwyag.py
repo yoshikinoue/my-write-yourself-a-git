@@ -666,5 +666,23 @@ def cmd_rev_parse(args):
     print(object_find(repo, args.name, args.type, follow=True))
 
 
+class GitIndexEntry(object):
+    ctime = None
+    mtime = None
+
+    dev = None
+    ino = None
+    mode_type = None
+    mode_perms = None
+    uid = None
+    gid = None
+    size = None
+    obj = None
+    flag_assume_valid = None
+    flag_extended = None
+    flag_stage = None
+    flag_name_length = None
+
+    name = None
 
 
